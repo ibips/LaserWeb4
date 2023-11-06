@@ -99,46 +99,87 @@ class LightenMachineBounds {
 };
 
 class Grid {
-    draw(drawCommands, { perspective, view, width, height, major = MAJOR_GRID_SPACING, minor = MINOR_GRID_SPACING }) {
-        if (!this.maingrid || !this.origin || this.width !== width || this.height !== height) {
+    draw(drawCommands, { perspective, view, width, height, major = MAJOR_GRID_SPACING, minor = MINOR_GRID_SPACING,  displayNegativeQuadrants}) {
+
+        if (!this.maingrid || !this.origin || this.width !== width || this.height !== height || this.displayNegativeQuadrants !== displayNegativeQuadrants) {
             this.width = width;
             this.height = height;
+            this.displayNegativeQuadrants = displayNegativeQuadrants
+
             let a = [];
             let b = [];
-            a.push(-this.width, -this.height, 0, this.width, -this.height, 0);
-            a.push(-this.width, -this.height, 0, -this.width, this.height, 0);
+            let minLeft, minBottom
+
+            if (this.displayNegativeQuadrants) {
+                minLeft = -this.width
+                minBottom = -this.height
+            } else {
+                minLeft = 0
+                minBottom = 0
+            }
+
+
+            // Top
+            a.push(minLeft, this.height, 0, this.width, this.height, 0);
+
+            // Left
+            a.push(minLeft, minBottom, 0, minLeft, this.height, 0);
+
+             // Bottom
+             a.push(minLeft, minBottom, 0, this.width, minBottom, 0);
+
+            // Right
+            a.push(this.width, minBottom, 0, this.width, this.height, 0);
+
+            
+            // Verticals
             for (let x = minor; x < this.width; x += minor) {
-                a.push(x, -this.height, 0, x, this.height, 0);
-                a.push(-x, -this.height, 0, -x, this.height, 0);
+                a.push(x, minBottom, 0, x, this.height, 0);
+                                
+                if (displayNegativeQuadrants) {
+                    a.push(-x, -this.height, 0, -x, this.height, 0); // Negative grids
+                }
+
                 if (x % major === 0) {
-                    b.push(x, -this.height, 0, x, this.height, 0);
-                    b.push(-x, -this.height, 0, -x, this.height, 0);
+                    b.push(x, minBottom, 0, x, this.height, 0);
+
+                    if (displayNegativeQuadrants) {
+                        b.push(-x, minBottom, 0, -x, this.height, 0); // Negative grids
+                    }
                 }
             }
-            a.push(this.width, -this.height, 0, this.width, this.height, 0);
+
+            // Horizontals
             for (let y = minor; y < this.height; y += minor) {
-                a.push(-this.width, y, 0, this.width, y, 0);
-                a.push(-this.width, -y, 0, this.width, -y, 0);
+                a.push(minLeft, y, 0, this.width, y, 0);
+
+                if (displayNegativeQuadrants) {
+                    a.push(minLeft, -y, 0, this.width, -y, 0); // Negative grids
+                }
+
                 if (y % major === 0) {
-                    b.push(-this.width, y, 0, this.width, y, 0);
-                    b.push(-this.width, -y, 0, this.width, -y, 0);
+                    b.push(minLeft, y, 0, this.width, y, 0);
+
+                    if (displayNegativeQuadrants) {
+                        b.push(minLeft, -y, 0, this.width, -y, 0); // Negative grids
+                    }
                 }
             }
-            a.push(-this.width, this.height, 0, this.width, this.height, 0);
+
             this.maingrid = new Float32Array(a);
             this.darkgrid = new Float32Array(b)
             this.maincount = a.length / 3;
             this.darkcount = b.length / 3;
 
             let c = [];
-            c.push(-this.width, 0, 0, this.width, 0, 0);
-            c.push(0, -this.height, 0, 0, this.height, 0);
+            c.push(minLeft, 0, 0, this.width, 0, 0);
+            c.push(0, minBottom, 0, 0, this.height, 0);
             this.origin = new Float32Array(c)
             this.origincount = c.length / 3
         }
 
         drawCommands.basic({ perspective, view, position: this.maingrid, offset: 0, count: this.maincount, color: [0.7, 0.7, 0.7, 0.95], scale: [1, 1, 1], translate: [0, 0, 0], primitive: drawCommands.gl.LINES }); // Gray grid
-        drawCommands.basic({ perspective, view, position: this.darkgrid, offset: 0, count: this.darkcount, color: [0.5, 0.5, 0.5, 0.95], scale: [1, 1, 1], translate: [0, 0, 0], primitive: drawCommands.gl.LINES }); // dark grid
+        drawCommands.basic({ perspective, view, position: this.darkgrid, offset: 0, count: this.darkcount, color: [0.5, 0.5, 0.5, 0.95], scale: [1, 1, 1], translate: [0, 0, 0], primitive: drawCommands.gl.LINES }); // Dark grid
 
         drawCommands.basic({ perspective, view, position: this.origin, offset: 0, count: 2, color: [0.6, 0, 0, 1], scale: [1, 1, 1], translate: [0, 0, 0], primitive: drawCommands.gl.LINES }); // Red
         drawCommands.basic({ perspective, view, position: this.origin, offset: 2, count: 2, color: [0, 0.8, 0, 1], scale: [1, 1, 1], translate: [0, 0, 0], primitive: drawCommands.gl.LINES }); // Green
@@ -146,18 +187,27 @@ class Grid {
 };
 
 function GridText(props) {
-    let { minor = MINOR_GRID_SPACING, major = MAJOR_GRID_SPACING, width, height } = props;
+    let { minor = MINOR_GRID_SPACING, major = MAJOR_GRID_SPACING, width, height, displayNegativeQuadrants } = props;
+
     let size = Math.min(major / 3, 10)
     let a = [];
+    // Horizontal
     for (let x = major; x <= width; x += major) {
         a.push(<Text3d key={'x' + x} x={x} y={-5} size={size} style={{ color: '#CC0000' }} label={String(x)} />);
-        a.push(<Text3d key={'x' + -x} x={-x} y={-5} size={size} style={{ color: '#CC0000' }} label={String(-x)} />);
+        if (displayNegativeQuadrants) {
+            a.push(<Text3d key={'x' + -x} x={-x} y={-5} size={size} style={{ color: '#CC0000' }} label={String(-x)} />);
+        } 
     }
-    a.push(<Text3d key="x-label" x={width + 15} y={0} size={size} style={{ color: '#CC0000' }}>X</Text3d>);
+    
+    // Vertical
     for (let y = major; y <= height; y += major) {
         a.push(<Text3d key={'y' + y} x={-10} y={y} size={size} style={{ color: '#00CC00' }} label={String(y)} />);
-        a.push(<Text3d key={'y' + -y} x={-10} y={-y} size={size} style={{ color: '#00CC00' }} label={String(-y)} />);
+        if (displayNegativeQuadrants) {
+            a.push(<Text3d key={'y' + -y} x={-10} y={-y} size={size} style={{ color: '#00CC00' }} label={String(-y)} />);
+        }
     }
+
+    a.push(<Text3d key="x-label" x={width + 15} y={0} size={size} style={{ color: '#CC0000' }}>X</Text3d>);
     a.push(<Text3d key="y-label" x={0} y={height + 15} size={size} style={{ color: '#00CC00' }}>Y</Text3d>);
     return <div>{a}</div>;
 }
@@ -799,6 +849,7 @@ class WorkspaceContent extends React.Component {
             width: this.props.settings.toolGridWidth, height: this.props.settings.toolGridHeight,
             minor: Math.max(this.props.settings.toolGridMinorSpacing,0.1),
             major: Math.max(this.props.settings.toolGridMajorSpacing,1),
+            displayNegativeQuadrants: this.props.settings.toolGridDisplayNegativeQuadrants
         });
         if (this.props.settings.showMachine)
             this.machineBounds.draw(this.drawCommands, {
@@ -937,6 +988,7 @@ class WorkspaceContent extends React.Component {
             width: this.props.settings.toolGridWidth, height: this.props.settings.toolGridHeight,
             minor: Math.max(this.props.settings.toolGridMinorSpacing,0.1),
             major: Math.max(this.props.settings.toolGridMajorSpacing,1),
+            displayNegativeQuadrants: this.props.settings.toolGridDisplayNegativeQuadrants,
         });
         if (this.props.settings.showMachine)
             this.machineBounds.draw(this.drawCommands, {
@@ -1233,6 +1285,7 @@ class WorkspaceContent extends React.Component {
             nextProps.width !== this.props.width ||
             nextProps.height !== this.props.height ||
             nextProps.settings.machineWidth !== this.props.settings.machineWidth || nextProps.settings.machineHeight !== this.props.settings.machineHeight ||
+            nextProps.settings.toolGridDisplayNegativeQuadrants !== this.props.settings.toolGridDisplayNegativeQuadrants ||
             nextProps.settings.machineBottomLeftX !== this.props.settings.machineBottomLeftX || nextProps.settings.machineBottomLeftY !== this.props.settings.machineBottomLeftY ||
             nextProps.settings.toolGridWidth !== this.props.settings.toolGridWidth || nextProps.settings.toolGridHeight !== this.props.settings.toolGridHeight ||
             nextProps.workspace.workOffsetX !== this.props.workspace.workOffsetX || nextProps.workspace.workOffsetY !== this.props.workspace.workOffsetY ||
@@ -1261,7 +1314,7 @@ class WorkspaceContent extends React.Component {
                             ref={this.setCanvas} />
                     </div>
                     <Dom3d className="workspace-content workspace-overlay" camera={this.camera} width={this.props.width} height={this.props.height} settings={this.props.settings}>
-                        <GridText {...{ width: this.props.settings.toolGridWidth, height: this.props.settings.toolGridHeight, minor: this.props.settings.toolGridMinorSpacing, major: this.props.settings.toolGridMajorSpacing }} />
+                        <GridText {...{ width: this.props.settings.toolGridWidth, height: this.props.settings.toolGridHeight, minor: this.props.settings.toolGridMinorSpacing, major: this.props.settings.toolGridMajorSpacing, displayNegativeQuadrants: this.props.settings.toolGridDisplayNegativeQuadrants }} />
                     </Dom3d>
                 </Pointable>
 

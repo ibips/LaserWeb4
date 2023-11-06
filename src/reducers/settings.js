@@ -31,6 +31,7 @@ export const SETTINGS_VALIDATION_RULES = {
 
     toolGridMinorSpacing: 'numeric|min:0.1',
     toolGridMajorSpacing: 'numeric|min:1',
+    toolGridDisplayNegativeQuadrants: 'boolean',
 
     jogFeedXY: 'numeric|min:0',
     jogFeedZ: 'numeric|min:0',
@@ -94,6 +95,7 @@ export const SETTINGS_INITIALSTATE = {
     toolGridHeight: 500,
     toolGridMinorSpacing: 10,
     toolGridMajorSpacing: 50,
+    toolGridDisplayNegativeQuadrants: true,
     toolSafetyLockDisabled: true,
     toolCncMode: false,
     toolImagePosition: "BL",
